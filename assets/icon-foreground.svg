@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <!-- Uyarlanabilir simge ön katmanı: 66 dp güvenli alan içinde parlayan simya şişesi (özgün çizim) -->
+  <defs>
+    <radialGradient id="halo" cx="54" cy="62" r="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe9a6" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#ffcf5a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffcf5a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff9ccb"/>
+      <stop offset="0.45" stop-color="#b858cf"/>
+      <stop offset="1" stop-color="#3b8cf0"/>
+    </linearGradient>
+    <clipPath id="body">
+      <path d="M47 33h14v9c0 1.2 .8 2.2 1.9 2.7C71 48.3 76 56 76 64.5 76 76.4 66.2 86 54 86S32 76.4 32 64.5c0-8.5 5-16.2 13.1-19.8A3 3 0 0 0 47 42Z"/>
+    </clipPath>
+  </defs>
+  <circle cx="54" cy="62" r="34" fill="url(#halo)"/>
+  <!-- cam -->
+  <path d="M47 33h14v9c0 1.2 .8 2.2 1.9 2.7C71 48.3 76 56 76 64.5 76 76.4 66.2 86 54 86S32 76.4 32 64.5c0-8.5 5-16.2 13.1-19.8A3 3 0 0 0 47 42Z" fill="#241f1d"/>
+  <g clip-path="url(#body)">
+    <rect x="28" y="56" width="52" height="34" fill="url(#liquid)"/>
+    <path d="M28 57c8-3 16 3 26 0s18-3 26 0v3H28Z" fill="#ffd0e6" opacity="0.9"/>
+    <circle cx="46" cy="70" r="2.6" fill="#fff" opacity="0.8"/>
+    <circle cx="60" cy="76" r="1.8" fill="#fff" opacity="0.7"/>
+    <circle cx="55" cy="64" r="1.4" fill="#fff" opacity="0.8"/>
+  </g>
+  <path d="M47 33h14v9c0 1.2 .8 2.2 1.9 2.7C71 48.3 76 56 76 64.5 76 76.4 66.2 86 54 86S32 76.4 32 64.5c0-8.5 5-16.2 13.1-19.8A3 3 0 0 0 47 42Z" fill="none" stroke="#1b120b" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M39 58c-2 4-2.5 9-1 13" stroke="#fff" stroke-opacity="0.55" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+  <!-- mantar tıpa ve pirinç bilezik -->
+  <rect x="45.5" y="25" width="17" height="10" rx="2.5" fill="#a8743f" stroke="#5a3a1c" stroke-width="1.8"/>
+  <rect x="44" y="34" width="20" height="4" rx="2" fill="#d9a441" stroke="#7a4f12" stroke-width="1.4"/>
+  <!-- parıltılar -->
+  <path d="M74 32l1.6 4.4 4.4 1.6-4.4 1.6L74 44l-1.6-4.4-4.4-1.6 4.4-1.6Z" fill="#ffe08a"/>
+  <path d="M33 38l1 2.8 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1Z" fill="#ffe08a"/>
+</svg>

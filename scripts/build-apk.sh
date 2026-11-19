@@ -20,7 +20,7 @@ npm run build
 echo "› Capacitor eşitleniyor"
 npx cap sync android
 echo "› Android release derleniyor"
-(cd android && ./gradlew --no-daemon -q assembleRelease)
+for i in 1 2 3; do (cd android && ./gradlew --no-daemon -q --max-workers=1 assembleRelease) && break; echo "Gradle yeniden deneniyor ($i)"; sleep 15; done
 
 APK=android/app/build/outputs/apk/release/app-release.apk
 mkdir -p release
