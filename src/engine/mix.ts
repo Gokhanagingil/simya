@@ -14,8 +14,9 @@ export function isPrimary(color: Color): color is PrimaryColor {
 
 /** İki farklı ana rengin karışımını döndürür; karışmıyorsa `null`. */
 export function mixColors(a: Color, b: Color): Color | null {
-  if (a === b || !isPrimary(a) || !isPrimary(b)) return null;
-  const key = [a, b].sort().join('+');
+  if (a === b) return null;
+  // Sıcak döngüde (çözücü) çağrıldığı için dizi/sıralama kullanmadan.
+  const key = a < b ? `${a}+${b}` : `${b}+${a}`;
   return MIX_TABLE[key] ?? null;
 }
 

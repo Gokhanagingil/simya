@@ -76,31 +76,67 @@ export function freeSpace(state: GameState, index: number): number {
   return state.capacity - (state.bottles[index]?.length ?? state.capacity);
 }
 
-/** Şişe kaynak olarak seçilebilir mi? (boş ve tamamlanmış şişeler seçilemez) */
-export function isSelectable(state: GameState, index: number): boolean {
-  const bottle = state.bottles[index];
-  if (!bottle || bottle.length === 0) return false;
-  if (isComplete(bottle, state.capacity)) return false;
-  return topGroup(bottle) !== null;
+/** Kural denetimi için şişenin özeti (tek geçişte hesaplanır). */
+export interface BottleInfo {
+  readonly length: number;
+  readonly complete: boolean;
+  /** Görünür üst grup; boşsa ya da üst birim gizliyse `null`. */
+  readonly top: TopGroup | null;
+}
+
+export function bottleInfo(bottle: Bottle, capacity: number): BottleInfo {
+  return { length: bottle.length, complete: isComplete(bottle, capacity), top: topGroup(bottle) };
+}
+
+export function bottleInfos(state: GameState): BottleInfo[] {
+  return state.bottles.map((b) => bottleInfo(b, state.capacity));
+}
+
+/** Kaynak olarak seçilebilirlik kuralı (boş ve tamamlanmış şişeler seçilemez). */
+export function selectableInfo(info: BottleInfo): boolean {
+  return info.length > 0 && !info.complete && info.top !== null;
 }
 
 export type PourKind = 'pour' | 'mix';
 
+/**
+ * DÖKME KURALI (tek kaynak). Hedef: boş şişe ya da üst rengi aynı ve yeri olan şişe;
+ * karışım etkinse farklı iki ana renk de geçerlidir.
+ */
+export function pourKindInfo(
+  src: BottleInfo,
+  dst: BottleInfo,
+  rules: RuleFlags,
+  capacity: number,
+): PourKind | null {
+  if (!selectableInfo(src)) return null;
+  if (dst.complete || dst.length >= capacity) return null;
+  if (dst.length === 0) return 'pour';
+  if (!dst.top) return null;
+  if (dst.top.color === src.top!.color) return 'pour';
+  if (rules.mix && mixColors(src.top!.color, dst.top.color)) return 'mix';
+  return null;
+}
+
+/** Şişe kaynak olarak seçilebilir mi? */
+export function isSelectable(state: GameState, index: number): boolean {
+  const bottle = state.bottles[index];
+  if (!bottle) return false;
+  return selectableInfo(bottleInfo(bottle, state.capacity));
+}
+
 /** Dökme geçerliyse türünü, değilse `null` döndürür. */
 export function pourKind(state: GameState, from: number, to: number): PourKind | null {
   if (from === to) return null;
-  if (!isSelectable(state, from)) return null;
-  const target = state.bottles[to];
-  if (!target) return null;
-  if (isComplete(target, state.capacity)) return null;
-  if (target.length >= state.capacity) return null;
-  if (target.length === 0) return 'pour';
-  const src = topGroup(state.bottles[from]!)!;
-  const dst = topGroup(target);
-  if (!dst) return null;
-  if (dst.color === src.color) return 'pour';
-  if (state.rules.mix && mixColors(src.color, dst.color)) return 'mix';
-  return null;
+  const a = state.bottles[from];
+  const b = state.bottles[to];
+  if (!a || !b) return null;
+  return pourKindInfo(
+    bottleInfo(a, state.capacity),
+    bottleInfo(b, state.capacity),
+    state.rules,
+    state.capacity,
+  );
 }
 
 export function canPour(state: GameState, from: number, to: number): boolean {
@@ -108,9 +144,12 @@ export function canPour(state: GameState, from: number, to: number): boolean {
 }
 
 export function getValidTargets(state: GameState, from: number): number[] {
+  const infos = bottleInfos(state);
+  const src = infos[from];
+  if (!src || !selectableInfo(src)) return [];
   const result: number[] = [];
-  for (let to = 0; to < state.bottles.length; to++) {
-    if (canPour(state, from, to)) result.push(to);
+  for (let to = 0; to < infos.length; to++) {
+    if (to !== from && pourKindInfo(src, infos[to]!, state.rules, state.capacity)) result.push(to);
   }
   return result;
 }
@@ -124,11 +163,14 @@ export function mixPreview(state: GameState, from: number, to: number): Color | 
 }
 
 export function listMoves(state: GameState): Move[] {
+  const infos = bottleInfos(state);
   const moves: Move[] = [];
-  for (let from = 0; from < state.bottles.length; from++) {
-    if (!isSelectable(state, from)) continue;
-    for (let to = 0; to < state.bottles.length; to++) {
-      if (canPour(state, from, to)) moves.push([from, to]);
+  for (let from = 0; from < infos.length; from++) {
+    const src = infos[from]!;
+    if (!selectableInfo(src)) continue;
+    for (let to = 0; to < infos.length; to++) {
+      if (to !== from && pourKindInfo(src, infos[to]!, state.rules, state.capacity))
+        moves.push([from, to]);
     }
   }
   return moves;
@@ -207,13 +249,7 @@ export function isWon(state: GameState): boolean {
 }
 
 export function hasAnyMove(state: GameState): boolean {
-  for (let from = 0; from < state.bottles.length; from++) {
-    if (!isSelectable(state, from)) continue;
-    for (let to = 0; to < state.bottles.length; to++) {
-      if (canPour(state, from, to)) return true;
-    }
-  }
-  return false;
+  return listMoves(state).length > 0;
 }
 
 /** Kazanılmamış ve hiç geçerli hamle yoksa kilitlenmiştir. */
@@ -271,6 +307,20 @@ const COLOR_CODES: Readonly<Record<Color, string>> = {
   brown: 'n',
   gray: 'a',
 };
+
+const CODE_TO_COLOR: Readonly<Record<string, Color>> = Object.fromEntries(
+  Object.entries(COLOR_CODES).map(([color, code]) => [code, color as Color]),
+);
+
+/** `bottleKey` çıktısından şişeyi geri kurar. */
+export function bottleFromKey(key: string): Bottle {
+  const out: Unit[] = [];
+  for (const ch of key) {
+    const lower = ch.toLowerCase();
+    out.push({ color: CODE_TO_COLOR[lower]!, hidden: ch !== lower });
+  }
+  return out;
+}
 
 export function canonicalKey(state: GameState): string {
   return state.bottles.map(bottleKey).sort().join('|');

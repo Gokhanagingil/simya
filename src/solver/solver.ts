@@ -2,15 +2,18 @@
  * En kısa çözümü bulan A* çözücü.
  * - Durumlar şişe sırasından bağımsız anahtarlarla (kanonik) tekilleştirilir.
  * - Sezgisel fonksiyon kabul edilebilir ve tutarlıdır; bu yüzden bulunan ilk çözüm
- *   KANITLANMIŞ en kısa çözümdür.
- * - Kurallar için oyun motorunu doğrudan kullanır (tek kaynak).
+ *   KANITLANMIŞ en kısa çözümdür (weight = 1 iken).
+ * - Kurallar için oyun motorunu doğrudan kullanır (tek kaynak). Bellek için düğümler
+ *   motorun şişe anahtarlarıyla sıkıştırılmış metin olarak saklanır.
  */
 import {
   applyMove,
-  canonicalKey,
+  bottleFromKey,
+  bottleKey,
   isWon,
   listMoves,
   topGroup,
+  type Bottle,
   type GameState,
   type Move,
 } from '../engine';
@@ -34,41 +37,93 @@ export interface SolveOptions {
   now?: () => number;
 }
 
-/**
- * Kabul edilebilir alt sınır.
- * R: tüm şişelerdeki saf renk koşularının toplamı, F: hedefte dolu olacak şişe sayısı.
- * Klasik/sis: her hamle R'yi en fazla 1 azaltır. Ayrıca tabanda hiç koşusu olmayan
- * her renk için boş şişeye en az bir dökme gerekir ve bu dökme R'yi azaltmaz.
- * Karışım: bir hamle R'yi en fazla 2 azaltabilir.
- */
+interface KeyStats {
+  runs: number;
+  /** Ana renk (kırmızı, sarı, mavi) koşuları. */
+  primaryRuns: number;
+  bottom: string;
+}
+
+const PRIMARY_CODES = new Set(['r', 'y', 'b']);
+
+/** Karışımla oluşturulamayan ve dönüşmeyen renkler (pembe, kahverengi, gri). */
+const FIXED_CODES = new Set(['k', 'n', 'a']);
+
+class HeuristicContext {
+  private cache = new Map<string, KeyStats>();
+  private totals = new Map<string, number>();
+  private readonly fixedOnly: boolean;
+
+  constructor(
+    start: readonly string[],
+    private readonly capacity: number,
+    private readonly mix: boolean,
+  ) {
+    this.fixedOnly = mix;
+    for (const key of start) {
+      for (const ch of key.toLowerCase()) this.totals.set(ch, (this.totals.get(ch) ?? 0) + 1);
+    }
+  }
+
+  private stats(key: string): KeyStats {
+    let st = this.cache.get(key);
+    if (!st) {
+      const lower = key.toLowerCase();
+      let runs = 0;
+      let primaryRuns = 0;
+      for (let i = 0; i < lower.length; i++) {
+        if (i === 0 || lower[i] !== lower[i - 1]) {
+          runs++;
+          if (PRIMARY_CODES.has(lower[i]!)) primaryRuns++;
+        }
+      }
+      st = { runs, primaryRuns, bottom: lower[0] ?? '' };
+      this.cache.set(key, st);
+    }
+    return st;
+  }
+
+  /**
+   * Kabul edilebilir alt sınır.
+   * R: saf renk koşularının toplamı, F: hedefte dolu olacak şişe sayısı (R ≥ F, hedefte R = F).
+   * Klasik/sis: her hamle R'yi en fazla 1 azaltır. Tabanda yeterli koşusu olmayan her renk için
+   * boş şişeye dökme gerekir; bu dökmeler R'yi azaltmaz → toplanabilir.
+   * Karışım: R = Rn + Ra (ana renk olmayan + ana renk koşuları). Karışım hamlesi Rn'yi azaltmaz,
+   * Ra'yı en fazla 2 azaltır; diğer hamleler Rn ya da Ra'yı en fazla 1 azaltır. Bu yüzden
+   * X = Rn + Ra/2 her hamlede en fazla 1 düşer ve hedefte X ≤ F olur → alt sınır ⌈X − F⌉.
+   * Ayrıca ⌈(R−F)/2⌉ de geçerlidir; ikisinin büyüğü alınır. Tabanı eksik sabit renkler
+   * (pembe, kahverengi, gri) için boş şişeye dökme gerekir ve bu dökme X'i azaltmaz.
+   * Her hamle sınırı en fazla 1 düşürür (tutarlı).
+   */
+  estimate(keys: readonly string[]): number {
+    let runs = 0;
+    let primaryRuns = 0;
+    let units = 0;
+    const bottoms = new Map<string, number>();
+    for (const key of keys) {
+      if (key.length === 0) continue;
+      const st = this.stats(key);
+      runs += st.runs;
+      primaryRuns += st.primaryRuns;
+      units += key.length;
+      bottoms.set(st.bottom, (bottoms.get(st.bottom) ?? 0) + 1);
+    }
+    const filled = Math.ceil(units / this.capacity);
+    const excess = Math.max(0, runs - filled);
+    let needBottom = 0;
+    for (const [c, n] of this.totals) {
+      if (this.fixedOnly && !FIXED_CODES.has(c)) continue;
+      needBottom += Math.max(0, Math.ceil(n / this.capacity) - (bottoms.get(c) ?? 0));
+    }
+    if (!this.mix) return excess + needBottom;
+    const weighted = Math.ceil(runs - primaryRuns + primaryRuns / 2 - filled);
+    return Math.max(Math.ceil(excess / 2), weighted) + needBottom;
+  }
+}
+
 export function heuristic(state: GameState): number {
-  let runs = 0;
-  let units = 0;
-  const totals = new Map<string, number>();
-  const bottoms = new Map<string, number>();
-  for (const bottle of state.bottles) {
-    units += bottle.length;
-    let prev: string | null = null;
-    for (let i = 0; i < bottle.length; i++) {
-      const c = bottle[i]!.color;
-      totals.set(c, (totals.get(c) ?? 0) + 1);
-      if (c !== prev) runs++;
-      prev = c;
-    }
-    if (bottle.length > 0) {
-      const c = bottle[0]!.color;
-      bottoms.set(c, (bottoms.get(c) ?? 0) + 1);
-    }
-  }
-  const filled = Math.ceil(units / state.capacity);
-  const excess = Math.max(0, runs - filled);
-  if (state.rules.mix) return Math.ceil(excess / 2);
-  let needBottom = 0;
-  for (const [c, n] of totals) {
-    const goalBottles = Math.ceil(n / state.capacity);
-    needBottom += Math.max(0, goalBottles - (bottoms.get(c) ?? 0));
-  }
-  return excess + needBottom;
+  const keys = state.bottles.map(bottleKey);
+  return new HeuristicContext(keys, state.capacity, state.rules.mix).estimate(keys);
 }
 
 /** Çözücü için budanmış hamle listesi (en kısa çözümü asla dışarıda bırakmaz). */
@@ -83,13 +138,11 @@ export function solverMoves(state: GameState): Move[] {
     }
   }
   for (const [from, to] of all) {
-    const target = state.bottles[to]!;
-    if (target.length === 0) {
+    if (state.bottles[to]!.length === 0) {
       // Boş şişeler birbirinin aynısıdır: yalnızca ilkine dökmek yeter.
       if (to !== firstEmpty) continue;
       // Tek renkli şişeyi bütünüyle boş şişeye dökmek durumu değiştirmez.
-      const src = state.bottles[from]!;
-      const g = topGroup(src);
+      const g = topGroup(state.bottles[from]!);
       if (g && g.start === 0) continue;
     }
     out.push([from, to]);
@@ -105,24 +158,37 @@ export function solve(start: GameState, options: SolveOptions = {}): SolveResult
 
   if (isWon(start)) return { status: 'solved', moves: [], optimal: true, expanded: 0 };
 
-  const states: GameState[] = [start];
+  const bottleCache = new Map<string, Bottle>();
+  const toBottle = (key: string): Bottle => {
+    let b = bottleCache.get(key);
+    if (!b) {
+      b = bottleFromKey(key);
+      bottleCache.set(key, b);
+    }
+    return b;
+  };
+
+  const startKeys = start.bottles.map(bottleKey);
+  const hctx = new HeuristicContext(startKeys, start.capacity, start.rules.mix);
+  const nodeKeys: string[] = [startKeys.join('|')];
   const parents: number[] = [-1];
   const moveFrom: number[] = [-1];
   const moveTo: number[] = [-1];
   const gs: number[] = [0];
-  const best = new Map<string, number>([[canonicalKey(start), 0]]);
+  const canonical = (keys: readonly string[]) => keys.slice().sort().join('|');
+  const best = new Map<string, number>([[canonical(startKeys), 0]]);
   const heap = new MinHeap();
   // Öncelik: f, eşitlikte daha derin düğüm önce.
   const SCALE = 4096;
-  heap.push(weight * heuristic(start) * SCALE, 0);
+  heap.push(weight * hctx.estimate(startKeys) * SCALE, 0);
   let expanded = 0;
 
   while (heap.size > 0) {
     const node = heap.pop()!;
-    const state = states[node]!;
     const g = gs[node]!;
-    const key = canonicalKey(state);
-    if ((best.get(key) ?? Infinity) < g) continue;
+    const keys = nodeKeys[node]!.split('|');
+    if ((best.get(canonical(keys)) ?? Infinity) < g) continue;
+    const state: GameState = { ...start, bottles: keys.map(toBottle), moves: g };
     if (isWon(state)) {
       const moves: Move[] = [];
       for (let n = node; parents[n]! >= 0; n = parents[n]!) moves.push([moveFrom[n]!, moveTo[n]!]);
@@ -135,17 +201,20 @@ export function solve(start: GameState, options: SolveOptions = {}): SolveResult
 
     for (const [from, to] of solverMoves(state)) {
       const next = applyMove(state, from, to).state;
-      const nk = canonicalKey(next);
+      const childKeys = keys.slice();
+      childKeys[from] = bottleKey(next.bottles[from]!);
+      childKeys[to] = bottleKey(next.bottles[to]!);
+      const ck = canonical(childKeys);
       const ng = g + 1;
-      if ((best.get(nk) ?? Infinity) <= ng) continue;
-      best.set(nk, ng);
-      const id = states.length;
-      states.push(next);
+      if ((best.get(ck) ?? Infinity) <= ng) continue;
+      best.set(ck, ng);
+      const id = nodeKeys.length;
+      nodeKeys.push(childKeys.join('|'));
       parents.push(node);
       moveFrom.push(from);
       moveTo.push(to);
       gs.push(ng);
-      const f = ng + weight * heuristic(next);
+      const f = ng + weight * hctx.estimate(childKeys);
       heap.push(f * SCALE - ng, id);
     }
   }

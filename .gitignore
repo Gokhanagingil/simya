@@ -13,3 +13,4 @@ keystore.properties
 signing/
 release/
 .env
+scripts/.cache
