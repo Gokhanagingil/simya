@@ -28,7 +28,7 @@
 
 ## Şu an
 
-- K4 test APK'sı kullanıcıya teslim edildi (`v0.0.4`); oyuncu geri bildirimi bekleniyor. Beklerken K8/K9 cilası.
+- K4 test APK'sı kullanıcıya teslim edildi (`v0.0.5`); oyuncu geri bildirimi bekleniyor. Beklerken K8/K9 cilası.
 
 ## Sıradaki adımlar
 
@@ -45,7 +45,7 @@
 | 2026-11-19 | Capacitor 8.6.2, compile/targetSdk 36, minSdk 24, AGP 8.13, Gradle 8.14.3, JDK 21.                                                                         | Güncel kararlı.                                                                                             |
 | 2026-11-19 | TypeScript 5.9 (7.x değil).                                                                                                                                | typescript-eslint TS 7'yi henüz desteklemiyor.                                                              |
 | 2026-11-19 | Keystore bulutta üretildi, kullanıcıya dosya olarak teslim; repoda yok. Konum `../simya-signing/`.                                                         | Kullanıcının seçimi.                                                                                        |
-| 2026-11-19 | Sürümleme: test APK `0.0.4` (versionCode 40), ilk tam sürüm `0.1.0` (1000).                                                                                | Her APK bir öncekinin üstüne güncelleme olarak kurulabilsin.                                                |
+| 2026-11-19 | Sürümleme: test APK `0.0.4`–`0.0.5` (versionCode 40–50), ilk tam sürüm `0.1.0` (1000).                                                                     | Her APK bir öncekinin üstüne güncelleme olarak kurulabilsin.                                                |
 | 2026-11-19 | "Tamamlandı" = dolu ve gerçek renkleri tek renk (gizli olsa bile); mühürlenince gizliler açılır.                                                           | Çözücüyle tutarlı; gereksiz kilitlenmeyi önler.                                                             |
 | 2026-11-19 | Açığa çıkan birim geri almayla tekrar gizlenmez; ekstra şişe geri almayla kaybolmaz; sis kaldır kalıcı.                                                    | "Kalıcı açığa çıkma" kuralı; ücretli güçler geri alınmamalı. Gizli birimler hareket etmediği için güvenli.  |
 | 2026-11-19 | Kilitlenme = hiç geçerli hamle yok.                                                                                                                        | Türün alışılmış davranışı; yanlış alarm yok.                                                                |

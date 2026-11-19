@@ -1,5 +1,5 @@
 /** Bölüm sonu: yıldızlar, hamleniz / en iyi çözüm, rekor, kazanılan toz ve malzeme. */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../app/store';
 import { sound } from '../audio/sound';
 import { Icon } from '../components/Icon';
@@ -22,6 +22,7 @@ export function ResultView(p: {
   const r = p.result;
   const rec = app.save.levels[p.level.id];
   const b = r.dustBreakdown;
+  const [tip, setTip] = useState<string | null>(null);
   useEffect(() => {
     if (r.materials.length) window.setTimeout(() => sound.play('discover'), 500);
     // Bağlamsal yardım: ilk malzeme ve ilk bölüm sonu, birer kez.
@@ -32,10 +33,7 @@ export function ResultView(p: {
           ? 'tip-result'
           : null;
     if (tipKey) {
-      window.setTimeout(
-        () => app.toast(tipKey === 'tip-material' ? tr.tips.firstMaterial : tr.tips.firstResult),
-        1200,
-      );
+      setTip(tipKey === 'tip-material' ? tr.tips.firstMaterial : tr.tips.firstResult);
       app.update((s) => ({ ...s, seen: [...new Set([...s.seen, tipKey])] }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,6 +71,13 @@ export function ResultView(p: {
             </div>
           )}
         </div>
+
+        {tip && (
+          <p className="tip-note" data-testid="result-tip">
+            <Icon name="info" size={22} />
+            <span>{tip}</span>
+          </p>
+        )}
 
         <div className="card result-card">
           <div className="result-row">
@@ -147,7 +152,7 @@ export function ResultView(p: {
           onClick={p.onNext}
           data-testid="next-level"
         >
-          {p.hasNext ? tr.result.next : tr.result.toMap}
+          {r.roomCompleted ? tr.common.continue : p.hasNext ? tr.result.next : tr.result.toMap}
           <Icon name="play" />
         </button>
         <div className="row-2">
