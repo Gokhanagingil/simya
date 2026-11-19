@@ -1,0 +1,75 @@
+apply plugin: 'com.android.application'
+
+import groovy.json.JsonSlurper
+
+// Sürüm package.json'dan okunur: 0.1.0 → versionCode 1000 (major*100000 + minor*1000 + patch*10).
+def pkg = new JsonSlurper().parse(rootProject.file('../package.json'))
+def semver = pkg.version.tokenize('.-')
+def appVersionCode = semver[0].toInteger() * 100000 + semver[1].toInteger() * 1000 + semver[2].toInteger() * 10
+def appVersionName = pkg.version
+
+// İmzalama: keystore REPODA DEĞİLDİR. Yol SIMYA_KEYSTORE_PROPERTIES ortam değişkeniyle
+// verilebilir; verilmezse repo klasörünün yanındaki ../simya-signing/keystore.properties aranır.
+def keystorePropsPath = System.getenv('SIMYA_KEYSTORE_PROPERTIES') ?: rootProject.file('../../simya-signing/keystore.properties').path
+def keystorePropsFile = new File(keystorePropsPath)
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+android {
+    namespace = "com.gokhanagingil.simya"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.gokhanagingil.simya"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
+        versionName appVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'

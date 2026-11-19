@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Simyacının Sırrı</string>
+    <string name="title_activity_main">Simyacının Sırrı</string>
+    <string name="package_name">com.gokhanagingil.simya</string>
+    <string name="custom_url_scheme">com.gokhanagingil.simya</string>
+</resources>

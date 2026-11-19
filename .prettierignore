@@ -1,0 +1,8 @@
+dist
+android
+node_modules
+src/levels/*.json
+package-lock.json
+test-results
+playwright-report
+e2e/screens
